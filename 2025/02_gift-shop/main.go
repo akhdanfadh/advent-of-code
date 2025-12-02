@@ -56,10 +56,10 @@ func process(ctx context.Context, file io.Reader, p2 bool) (int, error) {
 	scopes := strings.Split(line, ",")
 	results := make(chan int, len(scopes)) // channel to collect results
 	var wg sync.WaitGroup                  // to synchronize goroutines
-	var left, right int
 
 	for _, scope := range scopes {
 		// split the range to left and right
+		var left, right int
 		_, err := fmt.Sscanf(scope, "%d-%d", &left, &right)
 		if err != nil {
 			cancel() // signal workers to stop
@@ -71,19 +71,17 @@ func process(ctx context.Context, file io.Reader, p2 bool) (int, error) {
 		go func(left, right int) {
 			defer wg.Done()
 			sum := 0
+			check := isMirrored
+			if p2 {
+				check = isRepeated
+			}
 			for id := left; id <= right; id++ {
 				select {
 				case <-ctx.Done():
 					return // exit early if context is cancelled
 				default:
-					if p2 {
-						if isRepeated(id) {
-							sum += id
-						}
-					} else {
-						if isMirrored(id) {
-							sum += id
-						}
+					if check(id) {
+						sum += id
 					}
 				}
 			}
