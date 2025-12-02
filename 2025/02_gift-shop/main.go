@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -34,14 +35,18 @@ func main() {
 	}()
 
 	// main logic
-	result, err := process(file, *s2)
+	result, err := process(context.Background(), file, *s2)
 	if err != nil {
 		log.Fatalf("error: %s", err)
 	}
 	fmt.Printf("Total sum of invalid IDs: %d\n", result)
 }
 
-func process(file io.Reader, s2 bool) (int, error) {
+func process(ctx context.Context, file io.Reader, s2 bool) (int, error) {
+	// create cancellable context from parent
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	// read the first line (expected input format)
 	scanner := bufio.NewScanner(file)
 	scanner.Scan()
@@ -50,12 +55,13 @@ func process(file io.Reader, s2 bool) (int, error) {
 	scopes := strings.Split(line, ",")
 	results := make(chan int, len(scopes)) // channel to collect results
 	var wg sync.WaitGroup                  // to synchronize goroutines
+	var left, right int
 
 	for _, scope := range scopes {
 		// split the range to left and right
-		var left, right int
 		_, err := fmt.Sscanf(scope, "%d-%d", &left, &right)
 		if err != nil {
+			cancel() // signal workers to stop
 			return 0, fmt.Errorf("failed to parse range %q: %w", scope, err)
 		}
 
@@ -65,9 +71,13 @@ func process(file io.Reader, s2 bool) (int, error) {
 			defer wg.Done()
 			sum := 0
 			for id := left; id <= right; id++ {
-				if isMirrored(id) {
-					// fmt.Println(id)
-					sum += id
+				select {
+				case <-ctx.Done():
+					return // exit early if context is cancelled
+				default:
+					if isMirrored(id) {
+						sum += id
+					}
 				}
 			}
 			results <- sum
