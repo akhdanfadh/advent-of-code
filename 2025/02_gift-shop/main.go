@@ -122,15 +122,10 @@ func isMirrored(id int) bool {
 	return id/divisor == id%divisor
 }
 
-var divisors = make(map[int][]int)
-
-func init() {
-	// from pre-build divisors for lengths 1 to 20 (hard coded)
-	// TODO: optimization, use thread-safe divisors map
-	for n := 1; n <= 20; n++ {
-		divisors[n] = buildDivisors(n)
-	}
-}
+var (
+	divisors   = make(map[int][]int)
+	divisorsMu sync.RWMutex
+)
 
 func isRepeated(id int) bool {
 	// logic is to get the divisors of num digits of id
@@ -138,10 +133,28 @@ func isRepeated(id int) bool {
 	// then for each divisor, check if the pattern repeats
 	// eg, div 1 is 1->2 so go to next divisor, div 2 12->12->12->12 return true
 	digits := strconv.Itoa(id)
-	for _, patternLen := range divisors[len(digits)] {
+	lenDigits := len(digits)
+
+	// our global divisors maps are not thread-safe, so need proper	locking
+	divisorsMu.RLock() // try read lock first
+	divs, exists := divisors[lenDigits]
+	divisorsMu.RUnlock()
+	if !exists {
+		divisorsMu.Lock() // now exclusive lock for writing
+		// double check (another goroutine may have built it, avoid waste computation)
+		divs, exists = divisors[lenDigits]
+		if !exists {
+			divs = buildDivisors(lenDigits)
+			divisors[lenDigits] = divs
+		}
+		divisorsMu.Unlock()
+	}
+
+	// now check repeating patterns for each length
+	for _, patternLen := range divs {
 		matches := true
 		pattern := digits[:patternLen] // to match against
-		for i := patternLen; i < len(digits); i += patternLen {
+		for i := patternLen; i < lenDigits; i += patternLen {
 			if digits[i:i+patternLen] != pattern {
 				matches = false
 				break
