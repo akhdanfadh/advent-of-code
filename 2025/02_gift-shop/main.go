@@ -4,9 +4,9 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
-	"strconv"
 	"strings"
 )
 
@@ -41,7 +41,7 @@ func main() {
 	fmt.Printf("Total sum of invalid IDs: %d\n", result)
 }
 
-func process(file *os.File, s2 bool) (int, error) {
+func process(file io.Reader, s2 bool) (int, error) {
 	// read the first line (expected input format)
 	scanner := bufio.NewScanner(file)
 	scanner.Scan()
@@ -59,16 +59,30 @@ func process(file *os.File, s2 bool) (int, error) {
 		// now process the range
 		fmt.Printf("Processing range: %d - %d\n", left, right)
 		for id := left; id <= right; id++ {
-			idStr := strconv.Itoa(id) // convert to string for easy digit access
-			if len(idStr)%2 == 1 {
-				continue // skip odd-length IDs
-			}
-			midIndex := len(idStr) / 2
-			if idStr[:midIndex] == idStr[midIndex:] {
+			if isMirrored(id) {
 				fmt.Printf("  Invalid ID found: %d\n", id)
 				totalSum += id
-			} // check if first half matches second half
+			}
 		}
 	}
 	return totalSum, nil
+}
+
+func isMirrored(id int) bool {
+	// count digits
+	digits := 0
+	for temp := id; temp > 0; temp /= 10 {
+		digits++
+	}
+	if digits%2 == 1 {
+		return false // skip odd number of digits
+	}
+
+	// extract halves with power of 10
+	// eg, 1234 / 10*2 = 12, 1234 % 10*2 = 34
+	divisor := 1
+	for i := 0; i < digits/2; i++ {
+		divisor *= 10
+	}
+	return id/divisor == id%divisor
 }
