@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"strconv"
 )
@@ -56,14 +57,26 @@ func getPassword(fname string, s2 bool) (int, error) {
 
 		switch line[0] {
 		case 'R':
+			if s2 {
+				// we want to know how many times `(s+1)%100, (s+2)%100, ..., (s+n)%100` equal to 0
+				// equivalent to how many multiples of 100 are in the range (dialPos, dialPos+numSteps]
+				zeroCount += (dialPos + numSteps) / 100
+			}
 			dialPos = (dialPos + numSteps) % 100 // simple modulo logic to wrap around
 		case 'L':
+			if s2 {
+				// how many multiples of 100 are in the range [dialPos-numSteps, dialPos)
+				// tricky: go floor division of negative number is unlike math, e.g. -2/100=0!=-1
+				right := math.Floor(float64(dialPos-1) / 100)
+				left := math.Floor(float64(dialPos-1-numSteps) / 100)
+				zeroCount += int(right - left)
+			}
 			dialPos = ((dialPos-numSteps)%100 + 100) % 100 // tricky: go mod of negative number
 		default:
 			return 0, fmt.Errorf("invalid direction: %q", line[0])
 		}
 
-		if dialPos == 0 {
+		if !s2 && dialPos == 0 {
 			zeroCount++
 		} // password is number of times dial stop at 0
 	}
