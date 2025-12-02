@@ -8,13 +8,14 @@ import (
 	"io"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 )
 
 func main() {
 	// validate command line arguments
-	s2 := flag.Bool("s2", false, "enable step 2 logic")
+	p2 := flag.Bool("p2", false, "enable step 2 logic")
 	flag.Parse()        // parse optional
 	args := flag.Args() // get positional
 	if len(args) != 1 {
@@ -35,14 +36,14 @@ func main() {
 	}()
 
 	// main logic
-	result, err := process(context.Background(), file, *s2)
+	result, err := process(context.Background(), file, *p2)
 	if err != nil {
 		log.Fatalf("error: %s", err)
 	}
 	fmt.Printf("Total sum of invalid IDs: %d\n", result)
 }
 
-func process(ctx context.Context, file io.Reader, s2 bool) (int, error) {
+func process(ctx context.Context, file io.Reader, p2 bool) (int, error) {
 	// create cancellable context from parent
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -75,8 +76,14 @@ func process(ctx context.Context, file io.Reader, s2 bool) (int, error) {
 				case <-ctx.Done():
 					return // exit early if context is cancelled
 				default:
-					if isMirrored(id) {
-						sum += id
+					if p2 {
+						if isRepeated(id) {
+							sum += id
+						}
+					} else {
+						if isMirrored(id) {
+							sum += id
+						}
 					}
 				}
 			}
@@ -115,4 +122,47 @@ func isMirrored(id int) bool {
 		divisor *= 10
 	}
 	return id/divisor == id%divisor
+}
+
+var divisors = make(map[int][]int)
+
+func init() {
+	// from pre-build divisors for lengths 1 to 20 (hard coded)
+	// TODO: optimization, use thread-safe divisors map
+	for n := 1; n <= 20; n++ {
+		divisors[n] = buildDivisors(n)
+	}
+}
+
+func isRepeated(id int) bool {
+	// logic is to get the divisors of num digits of id
+	// eg, for 12121212 (num digits 8), divisors are [1,2,4]
+	// then for each divisor, check if the pattern repeats
+	// eg, div 1 is 1->2 so go to next divisor, div 2 12->12->12->12 return true
+	digits := strconv.Itoa(id)
+	for _, patternLen := range divisors[len(digits)] {
+		matches := true
+		pattern := digits[:patternLen] // to match against
+		for i := patternLen; i < len(digits); i += patternLen {
+			if digits[i:i+patternLen] != pattern {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			return true
+		} // found a repeating pattern, direct return
+	}
+	return false
+}
+
+func buildDivisors(n int) []int {
+	// eg, n=24 => [1,2,3,4,6,8,12]
+	var res []int
+	for i := 1; i <= n/2; i++ {
+		if n%i == 0 {
+			res = append(res, i)
+		}
+	}
+	return res
 }
