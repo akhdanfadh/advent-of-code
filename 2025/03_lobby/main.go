@@ -78,29 +78,11 @@ func process(ctx context.Context, file io.ReadSeeker, p2 bool) (int, error) {
 		go func(digits string) {
 			defer wg.Done()
 
-			// try to visualize this yourself hehe
-			// this logic makes our algorithm O(n*m) if not parallelized,
-			// where n is length of digits, m is how many line of digits
-			idxBestLeft, idxBestRight := 0, 1
-			for idxPointer := 1; idxPointer < len(digits); idxPointer++ {
-				// if current digit > best left digit and not the last digit,
-				// make that current digit the best left digit, and the next digit the best right digit
-				if digits[idxPointer] > digits[idxBestLeft] && idxPointer != len(digits)-1 {
-					idxBestLeft, idxBestRight = idxPointer, idxPointer+1
-				} else {
-					// otherwise, check if current digit > best right digit,
-					// if yes, make current digit the best right digit
-					if digits[idxPointer] > digits[idxBestRight] {
-						idxBestRight = idxPointer
-					}
-				}
+			joltFunc := joltOne
+			if p2 {
+				joltFunc = joltTwo
 			}
-
-			// when we index a string, we get byte (value of 50 ASCII for '2')
-			// so byte offset '0' (48 ASCII) to get actual digit value (in byte)
-			digitLeft := digits[idxBestLeft] - '0'
-			digitRight := digits[idxBestRight] - '0'
-			jolt := int(digitLeft*10 + digitRight)
+			jolt := joltFunc(digits)
 			fmt.Printf("bank=%s, jolt=%d\n", digits, jolt)
 
 			select {
@@ -130,6 +112,66 @@ func process(ctx context.Context, file io.ReadSeeker, p2 bool) (int, error) {
 		totalJolt += jolt
 	}
 	return totalJolt, nil
+}
+
+func joltOne(digits string) int {
+	// try to visualize this yourself hehe
+	// this logic makes our algorithm O(n*m) if not parallelized,
+	// where n is length of digits, m is how many line of digits
+	idxBestLeft, idxBestRight := 0, 1
+	for idxPointer := 1; idxPointer < len(digits); idxPointer++ {
+		// if current digit > best left digit and not the last digit,
+		// make that current digit the best left digit, and the next digit the best right digit
+		if digits[idxPointer] > digits[idxBestLeft] && idxPointer != len(digits)-1 {
+			idxBestLeft, idxBestRight = idxPointer, idxPointer+1
+		} else {
+			// otherwise, check if current digit > best right digit,
+			// if yes, make current digit the best right digit
+			if digits[idxPointer] > digits[idxBestRight] {
+				idxBestRight = idxPointer
+			}
+		}
+	}
+
+	// when we index a string, we get byte (value of 50 ASCII for '2')
+	// so byte offset '0' (48 ASCII) to get actual digit value (in byte)
+	digitLeft := digits[idxBestLeft] - '0'
+	digitRight := digits[idxBestRight] - '0'
+	jolt := int(digitLeft*10 + digitRight)
+	return jolt
+}
+
+func joltTwo(digits string) int {
+	// the idea is kind of sliding window, let's say
+	// digits = 2357809, len(digits) = 7, need to find 4 digits to make largest
+	// we need to 'somehow' iterate the digits 4 times to fill in the slot result
+	// i.e. find the max in 2357, then find max in 3578, then 5780, then 7809 (with tricks!!)
+	// see right there? haha greedy clever and this way it will lexicographically largest too
+	const k = 12
+	n := len(digits)
+	result := 0
+
+	idxStart := 0
+	for i := range k {
+		idxEnd := n - k + i // start to end inclusive
+
+		// find the largest digits in this range
+		idxBest := idxStart
+		for j := idxStart; j <= idxEnd; j++ {
+			if digits[j] > digits[idxBest] {
+				idxBest = j
+			}
+		}
+
+		// add to result
+		digit := digits[idxBest] - '0'
+		result = result*10 + int(digit)
+
+		// TRICKY here, next search starts after the best found
+		idxStart = idxBest + 1
+	}
+
+	return result
 }
 
 // lineCounter is faster line counter using bytes.Count to find the newline characters
