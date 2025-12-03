@@ -8,7 +8,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"strconv"
 	"sync"
 )
 
@@ -42,7 +41,7 @@ func main() {
 	fmt.Printf("Total output joltage: %d\n", result)
 }
 
-func process(file io.Reader, p2 bool) (int, error) {
+func process(file io.ReadSeeker, p2 bool) (int, error) {
 	// first count lines for goroutine channel buffer size
 	lc, err := lineCounter(file)
 	if err != nil {
@@ -51,9 +50,15 @@ func process(file io.Reader, p2 bool) (int, error) {
 	fmt.Printf("Amount of battery banks: %d\n", lc)
 	jolts := make(chan int, lc) // channel to collect results
 	var wg sync.WaitGroup       // to synchronize goroutines
+	// why not just unbuffered channel? "true parallelism"
+	// with unbuffered, workers that finish early will just wait (eg line 1 goroutine finishes
+	// before main goroutine start receiving, ie, the loop scanner.Scan hasn't done)
+	// with buffered, early finishers can deposit results and exit, allowing more concurrency
+	// BUT this comes with tradeoff where we read the file first, so tradeoff speed needs to be actually
 
 	// reset file pointer to beginning
-	_, err = file.(io.Seeker).Seek(0, io.SeekStart)
+	// file must be also io.Seeker to make sure that file is seekable (if not, will panic)
+	_, err = file.Seek(0, io.SeekStart)
 	if err != nil {
 		return 0, fmt.Errorf("failed to seek to beginning of file: %w", err)
 	}
@@ -61,30 +66,39 @@ func process(file io.Reader, p2 bool) (int, error) {
 	// read line by line
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		line := scanner.Text()
+		digits := scanner.Text()
 
 		// now process the line concurrently
 		wg.Add(1)
-		go func(line string) {
+		go func(digits string) {
 			defer wg.Done()
 
 			// try to visualize this yourself hehe
-			left, right := 0, 1
-			for i := 1; i < len(line); i++ {
-				if line[i] > line[left] && i != len(line)-1 {
-					left, right = i, i+1
+			// this logic makes our algorithm O(n*m) if not parallelized,
+			// where n is length of digits, m is how many line of digits
+			idxBestLeft, idxBestRight := 0, 1
+			for idxPointer := 1; idxPointer < len(digits); idxPointer++ {
+				// if current digit > best left digit and not the last digit,
+				// make that current digit the best left digit, and the next digit the best right digit
+				if digits[idxPointer] > digits[idxBestLeft] && idxPointer != len(digits)-1 {
+					idxBestLeft, idxBestRight = idxPointer, idxPointer+1
 				} else {
-					if line[i] > line[right] {
-						right = i
+					// otherwise, check if current digit > best right digit,
+					// if yes, make current digit the best right digit
+					if digits[idxPointer] > digits[idxBestRight] {
+						idxBestRight = idxPointer
 					}
 				}
 			}
 
-			// TODO: error handling for Atoi inside goroutine
-			jolt, _ := strconv.Atoi(string(line[left]) + string(line[right]))
-			fmt.Printf("bank=%s, jolt=%d\n", line, jolt)
-			jolts <- jolt
-		}(line)
+			// when we index a string, we get byte (value of 50 ASCII for '2')
+			// so byte offset '0' (48 ASCII) to get actual digit value (in byte)
+			digitLeft := digits[idxBestLeft] - '0'
+			digitRight := digits[idxBestRight] - '0'
+			jolt := digitLeft*10 + digitRight
+			fmt.Printf("bank=%s, jolt=%d\n", digits, jolt)
+			jolts <- int(jolt) // jolt is in byte, convert to int
+		}(digits)
 	}
 
 	// close channel once all goroutines are done
