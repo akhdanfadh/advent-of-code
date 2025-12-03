@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -34,14 +35,18 @@ func main() {
 	}()
 
 	// main logic
-	result, err := process(file, *p2)
+	result, err := process(context.Background(), file, *p2)
 	if err != nil {
 		log.Fatalf("error: %s", err)
 	}
 	fmt.Printf("Total output joltage: %d\n", result)
 }
 
-func process(file io.ReadSeeker, p2 bool) (int, error) {
+func process(ctx context.Context, file io.ReadSeeker, p2 bool) (int, error) {
+	// create cancellable context from parent
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	// first count lines for goroutine channel buffer size
 	lc, err := lineCounter(file)
 	if err != nil {
@@ -95,10 +100,22 @@ func process(file io.ReadSeeker, p2 bool) (int, error) {
 			// so byte offset '0' (48 ASCII) to get actual digit value (in byte)
 			digitLeft := digits[idxBestLeft] - '0'
 			digitRight := digits[idxBestRight] - '0'
-			jolt := digitLeft*10 + digitRight
+			jolt := int(digitLeft*10 + digitRight)
 			fmt.Printf("bank=%s, jolt=%d\n", digits, jolt)
-			jolts <- int(jolt) // jolt is in byte, convert to int
+
+			select {
+			case jolts <- jolt:
+				// send succeeds, do nothing special (not fallthrough like C)
+			case <-ctx.Done():
+				return // abort if context cancelled
+			}
 		}(digits)
+	}
+
+	// if scanner somehow fails mid-way, prevent goroutine leaks
+	if err := scanner.Err(); err != nil {
+		cancel() // signal all goroutines to stop
+		return 0, fmt.Errorf("failed to scan file: %w", err)
 	}
 
 	// close channel once all goroutines are done
