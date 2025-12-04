@@ -70,7 +70,7 @@ func isRoll(char byte) bool {
 
 // brute force to the rescue haha
 func partOne(grid [][]byte) (int, error) {
-	result := 0
+	resultChan := make(chan int, len(grid))
 	directions := [8][2]int{
 		{-1, 0},  // up
 		{-1, 1},  // up-right
@@ -83,30 +83,40 @@ func partOne(grid [][]byte) (int, error) {
 	}
 
 	for r := range len(grid) {
-		for c := range len(grid[r]) {
-			if !isRoll(grid[r][c]) {
-				continue
-			}
+		go func(r int) {
+			result := 0
+			for c := range len(grid[r]) {
+				if !isRoll(grid[r][c]) {
+					continue
+				}
 
-			adjacentRolls := 0
-			for _, dir := range directions {
-				nr, nc := r+dir[0], c+dir[1]
-				if nr >= 0 && nr < len(grid) &&
-					nc >= 0 && nc < len(grid[r]) &&
-					isRoll(grid[nr][nc]) {
-					adjacentRolls++
-					if adjacentRolls >= 4 {
-						break // stop early
+				adjacentRolls := 0
+				for _, dir := range directions {
+					nr, nc := r+dir[0], c+dir[1]
+					if nr >= 0 && nr < len(grid) &&
+						nc >= 0 && nc < len(grid[r]) &&
+						isRoll(grid[nr][nc]) {
+						adjacentRolls++
+						if adjacentRolls >= 4 {
+							break // stop early
+						}
 					}
 				}
-			}
 
-			if adjacentRolls < 4 {
-				result++
+				if adjacentRolls < 4 {
+					result++
+				}
 			}
-		}
+			resultChan <- result
+		}(r)
 	}
-	return result, nil
+
+	// collect results
+	total := 0
+	for range grid {
+		total += <-resultChan
+	}
+	return total, nil
 }
 
 func partTwo(grid [][]byte) (int, error) {
