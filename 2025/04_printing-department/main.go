@@ -71,6 +71,17 @@ func isRoll(char byte) bool {
 // brute force to the rescue haha
 func partOne(grid [][]byte) (int, error) {
 	result := 0
+	directions := [8][2]int{
+		{-1, 0},  // up
+		{-1, 1},  // up-right
+		{0, 1},   // right
+		{1, 1},   // down-right
+		{1, 0},   // down
+		{1, -1},  // down-left
+		{0, -1},  // left
+		{-1, -1}, // up-left
+	}
+
 	for r := range len(grid) {
 		for c := range len(grid[r]) {
 			if !isRoll(grid[r][c]) {
@@ -78,30 +89,17 @@ func partOne(grid [][]byte) (int, error) {
 			}
 
 			adjacentRolls := 0
-			if r-1 >= 0 && isRoll(grid[r-1][c]) {
-				adjacentRolls++
-			} // up
-			if r-1 >= 0 && c+1 < len(grid[r]) && isRoll(grid[r-1][c+1]) {
-				adjacentRolls++
-			} // up-right
-			if c+1 < len(grid[r]) && isRoll(grid[r][c+1]) {
-				adjacentRolls++
-			} // right
-			if r+1 < len(grid) && c+1 < len(grid[r]) && isRoll(grid[r+1][c+1]) {
-				adjacentRolls++
-			} // down-right
-			if r+1 < len(grid) && isRoll(grid[r+1][c]) {
-				adjacentRolls++
-			} // down
-			if r+1 < len(grid) && c-1 >= 0 && isRoll(grid[r+1][c-1]) {
-				adjacentRolls++
-			} // down-left
-			if c-1 >= 0 && isRoll(grid[r][c-1]) {
-				adjacentRolls++
-			} // left
-			if r-1 >= 0 && c-1 >= 0 && isRoll(grid[r-1][c-1]) {
-				adjacentRolls++
-			} // up-left
+			for _, dir := range directions {
+				nr, nc := r+dir[0], c+dir[1]
+				if nr >= 0 && nr < len(grid) &&
+					nc >= 0 && nc < len(grid[r]) &&
+					isRoll(grid[nr][nc]) {
+					adjacentRolls++
+					if adjacentRolls >= 4 {
+						break // stop early
+					}
+				}
+			}
 
 			if adjacentRolls < 4 {
 				result++
