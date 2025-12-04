@@ -68,19 +68,20 @@ func isRoll(char byte) bool {
 	return char == '@'
 }
 
+var directions = [8][2]int{
+	{-1, 0},  // up
+	{-1, 1},  // up-right
+	{0, 1},   // right
+	{1, 1},   // down-right
+	{1, 0},   // down
+	{1, -1},  // down-left
+	{0, -1},  // left
+	{-1, -1}, // up-left
+}
+
 // brute force to the rescue haha
 func partOne(grid [][]byte) (int, error) {
 	resultChan := make(chan int, len(grid))
-	directions := [8][2]int{
-		{-1, 0},  // up
-		{-1, 1},  // up-right
-		{0, 1},   // right
-		{1, 1},   // down-right
-		{1, 0},   // down
-		{1, -1},  // down-left
-		{0, -1},  // left
-		{-1, -1}, // up-left
-	}
 
 	for r := range len(grid) {
 		go func(r int) {
@@ -120,5 +121,56 @@ func partOne(grid [][]byte) (int, error) {
 }
 
 func partTwo(grid [][]byte) (int, error) {
-	return 0, nil
+	// read and store where rolls are
+	rolls := make([][2]int, 0)
+	for r := range len(grid) {
+		for c := range len(grid[r]) {
+			if isRoll(grid[r][c]) {
+				rolls = append(rolls, [2]int{r, c})
+			}
+		}
+	}
+
+	// while loop until there is no roll to remove
+	result := 0
+	for {
+		removed := make([][2]int, 0)
+		stayed := make([][2]int, 0)
+
+		// check all rolls in current iteration
+		for _, pos := range rolls {
+			r, c := pos[0], pos[1]
+			adjacentRolls := 0
+			for _, dir := range directions {
+				nr, nc := r+dir[0], c+dir[1]
+				if nr >= 0 && nr < len(grid) &&
+					nc >= 0 && nc < len(grid[r]) &&
+					isRoll(grid[nr][nc]) {
+					adjacentRolls++
+					if adjacentRolls >= 4 {
+						break // stop early
+					}
+				}
+			}
+			if adjacentRolls < 4 {
+				removed = append(removed, pos)
+			} else {
+				stayed = append(stayed, pos)
+			}
+		}
+
+		// break loop as there are no roll to remove
+		if len(removed) == 0 {
+			break
+		}
+
+		// update rolls and grid for next iteration
+		fmt.Printf("Removed %d from %d rolls\n", len(removed), len(rolls))
+		rolls = stayed
+		for _, pos := range removed {
+			grid[pos[0]][pos[1]] = '.' // mark as removed
+		}
+		result += len(removed)
+	}
+	return result, nil
 }
