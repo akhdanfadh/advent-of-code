@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
 	"strings"
 )
 
@@ -27,7 +28,7 @@ func main() {
 	}
 
 	// main logic
-	process := partOne
+	process := partOne // or partOneBrute
 	if *p2 {
 		process = partTwo
 	}
@@ -88,8 +89,72 @@ func readFile(fname string) ([][2]int, []int, error) {
 	return ranges, ingredients, nil
 }
 
-// brute force solution
+func sortRanges(ranges [][2]int) {
+	// this built-in sort function will sort by:
+	// if return negative, a should come before b
+	// if return positive, a should come after b
+	// if return zero, a and b are equal in sort order
+	slices.SortFunc(ranges, func(a, b [2]int) int {
+		return a[0] - b[0]
+	})
+}
+
+func mergeRanges(ranges [][2]int) [][2]int {
+	// this assumes ranges are already sorted by start
+	// cur: [1-5], next: [3-8] -> overlap
+	// cur: [1-5], next: [6-8] -> adjacent
+	// cur: [1-5], next: [7-8] -> separate
+	merged := make([][2]int, len(ranges))
+	cur := ranges[0]
+	for i := 1; i < len(ranges); i++ {
+		next := ranges[i]
+		if next[0] <= cur[1]+1 { // overlap or adjacent
+			if next[1] > cur[1] {
+				cur[1] = next[1]
+			}
+		} else { // separate
+			merged = append(merged, cur)
+			cur = next
+		}
+	}
+	merged = append(merged, cur) // last range
+	return merged
+}
+
+func isFreshBinarySearch(id int, ranges [][2]int) bool {
+	left, right := 0, len(ranges)-1
+	for left <= right {
+		mid := left + (right-left)/2
+		r := ranges[mid]
+		if id < r[0] { // before this range, search left
+			right = mid - 1
+		} else if id > r[1] { // after this range, search right
+			left = mid + 1
+		} else { // in this range
+			return true
+		}
+	}
+	return false
+}
+
+// binary search solution
 func partOne(ranges [][2]int, ingredients []int) (int, error) {
+	// preprocess ranges: sort and merged
+	sortRanges(ranges)
+	ranges = mergeRanges(ranges)
+
+	// process ingredients: binary search
+	count := 0
+	for _, ing := range ingredients {
+		if isFreshBinarySearch(ing, ranges) {
+			count++
+		}
+	}
+	return count, nil
+}
+
+// brute force solution
+func partOneBrute(ranges [][2]int, ingredients []int) (int, error) {
 	count := 0
 	for _, ing := range ingredients {
 		for _, r := range ranges {
