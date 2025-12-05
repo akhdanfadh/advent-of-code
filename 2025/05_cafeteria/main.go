@@ -104,7 +104,7 @@ func mergeRanges(ranges [][2]int) [][2]int {
 	// cur: [1-5], next: [3-8] -> overlap
 	// cur: [1-5], next: [6-8] -> adjacent
 	// cur: [1-5], next: [7-8] -> separate
-	merged := make([][2]int, len(ranges))
+	merged := make([][2]int, 0, len(ranges)) // careful here, need the zero!
 	cur := ranges[0]
 	for i := 1; i < len(ranges); i++ {
 		next := ranges[i]
@@ -169,5 +169,15 @@ func partOneBrute(ranges [][2]int, ingredients []int) (int, error) {
 }
 
 func partTwo(ranges [][2]int, ingredients []int) (int, error) {
-	return 0, nil
+	// preprocess ranges: sort and merged
+	sortRanges(ranges)
+	ranges = mergeRanges(ranges)
+
+	// we only need the ranges here
+	count := 0
+	for _, r := range ranges {
+		fmt.Printf("Fresh range: %d-%d\n", r[0], r[1])
+		count += r[1] - r[0] + 1
+	}
+	return count, nil
 }
