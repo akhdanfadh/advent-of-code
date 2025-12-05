@@ -38,49 +38,51 @@ func main() {
 	fmt.Printf("Fresh ingredients count: %d\n", result)
 }
 
-func readFile(fname string) (ranges [][2]int, ingredients []int, err error) {
+func readFile(fname string) ([][2]int, []int, error) {
 	// open file
 	file, err := os.Open(fname)
 	if err != nil {
 		return nil, nil, err
 	}
 	defer func() {
-		if cerr := file.Close(); cerr != nil {
+		if cerr := file.Close(); cerr != nil && err == nil {
 			err = cerr
 		}
 	}()
 
 	// read ranges
-	var left, right int
+	ranges := make([][2]int, 0)
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
-
-		// check for blank line
 		if strings.TrimSpace(line) == "" {
 			break
-		}
+		} // break on empty line
 
-		// read the ranges
-		_, err = fmt.Sscanf(line, "%d-%d", &left, &right)
+		var lo, hi int
+		_, err = fmt.Sscanf(line, "%d-%d", &lo, &hi)
 		if err != nil {
 			return nil, nil, err
 		}
-		ranges = append(ranges, [2]int{left, right})
+		ranges = append(ranges, [2]int{lo, hi})
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, nil, err
 	}
 
 	// read ingredients
-	var ingredient int
+	ingredients := make([]int, 0)
 	for scanner.Scan() {
 		line := scanner.Text()
-		_, err = fmt.Sscanf(line, "%d", &ingredient)
+		var ing int
+		_, err = fmt.Sscanf(line, "%d", &ing)
 		if err != nil {
 			return nil, nil, err
 		}
-		ingredients = append(ingredients, ingredient)
+		ingredients = append(ingredients, ing)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, nil, err
 	}
 
 	return ranges, ingredients, nil
