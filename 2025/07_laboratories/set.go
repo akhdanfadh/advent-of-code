@@ -25,13 +25,10 @@ func (s *Set[T]) Size() int {
 	return len(s.items)
 }
 
-func (s *Set[T]) Iterate() <-chan T {
-	ch := make(chan T)
-	go func() {
-		for item := range s.items {
-			ch <- item
-		}
-		close(ch)
-	}()
-	return ch
+func (s *Set[T]) Items() []T {
+	keys := make([]T, 0, len(s.items))
+	for k := range s.items {
+		keys = append(keys, k)
+	}
+	return keys
 }

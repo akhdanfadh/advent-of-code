@@ -79,7 +79,7 @@ func partOne(filename string) (int, error) {
 		}
 
 		// split if there are any beam positions at splitters
-		for beam := range beams.Iterate() {
+		for _, beam := range beams.Items() {
 			if splitters.Contains(beam) {
 				beams.Add(beam - 1)
 				beams.Add(beam + 1)
