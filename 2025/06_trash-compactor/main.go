@@ -21,25 +21,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	// read input file
-	nums, syms, err := readFile(args[0])
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	// main logic
 	process := partOne // or partOneBrute
 	if *p2 {
 		process = partTwo
 	}
-	fmt.Printf("Total: %d\n", process(nums, syms))
+	result, err := process(args[0])
+	if err != nil {
+		log.Fatalf("Error: %v\n", err)
+	}
+	fmt.Printf("Total: %d\n", result)
 }
 
-func readFile(fname string) ([]uint64, []byte, error) {
+func partOne(fname string) (uint64, error) {
 	// open file
 	file, err := os.Open(fname)
 	if err != nil {
-		return nil, nil, err
+		return 0, err
 	}
 	defer func() {
 		if cerr := file.Close(); cerr != nil && err == nil {
@@ -67,19 +65,16 @@ func readFile(fname string) ([]uint64, []byte, error) {
 		for numStr := range strings.FieldsSeq(line) {
 			num, err := strconv.ParseUint(numStr, 10, 64)
 			if err != nil {
-				return nil, nil, err
+				return 0, err
 			}
 			nums = append(nums, num)
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, nil, err
+		return 0, err
 	}
 
-	return nums, syms, nil
-}
-
-func partOne(nums []uint64, syms []byte) uint64 {
+	// process numbers and symbols
 	result := uint64(0)
 	numLines := len(nums) / len(syms)
 	for symIdx, sym := range syms {
@@ -98,9 +93,9 @@ func partOne(nums []uint64, syms []byte) uint64 {
 		fmt.Printf("%d %c: %d\n", symIdx, sym, innerResult)
 		result += innerResult
 	}
-	return result
+	return result, nil
 }
 
-func partTwo(nums []uint64, syms []byte) uint64 {
-	return 0
+func partTwo(fname string) (uint64, error) {
+	return 0, nil
 }
