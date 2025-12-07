@@ -12,8 +12,9 @@ import (
 var (
 	filename        *string
 	version         *string
-	versionHandlers = map[string]func(string) (int, error){
+	versionHandlers = map[string]func(string) (string, error){
 		"1": partOne,
+		"2": partTwo,
 	}
 )
 
@@ -44,14 +45,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error: %v\n", err)
 	}
-	fmt.Printf("The beam is split %d times\n", result)
+	fmt.Print(result)
 }
 
-func partOne(filename string) (int, error) {
+func partOne(filename string) (string, error) {
 	// open file
 	file, err := os.Open(filename)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 	defer file.Close() // error not checked as file only for reading
 
@@ -67,10 +68,10 @@ func partOne(filename string) (int, error) {
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return 0, err
+		return "", err
 	}
 	if beams.Size() == 0 {
-		return 0, fmt.Errorf("no beam origin 'S' found in the input")
+		return "", fmt.Errorf("no beam origin 'S' found in the input")
 	}
 
 	// now split the beam(s) while reading line by line
@@ -96,10 +97,10 @@ func partOne(filename string) (int, error) {
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return 0, err
+		return "", err
 	}
 
-	return splitCount, nil
+	return fmt.Sprintf("The beam is split %d times\n", splitCount), nil
 }
 
 func getSplitters(s string, b byte) *Set[int] {
@@ -114,4 +115,66 @@ func getSplitters(s string, b byte) *Set[int] {
 		i += idx + 1 // next look after found index
 	}
 	return splitters
+}
+
+func partTwo(filename string) (string, error) {
+	// open file
+	file, err := os.Open(filename)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close() // error not checked as file only for reading
+
+	// find beam origin 'S': ideally on the first line
+	var beamOrigin int
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		beamOrigin = strings.IndexByte(line, 'S')
+		if beamOrigin >= 0 {
+			break
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return "", err
+	}
+	if beamOrigin < 0 {
+		return "", fmt.Errorf("no beam origin 'S' found in the input")
+	}
+
+	// instead of processing line by line, we want some kind of backtracking here
+	// so we read all lines first containing splitters
+	splittersLines := make([]*Set[int], 0)
+	for scanner.Scan() {
+		line := scanner.Text()
+		splitters := getSplitters(line, '^')
+		if splitters.Size() == 0 {
+			continue
+		}
+		splittersLines = append(splittersLines, splitters)
+	}
+	if err := scanner.Err(); err != nil {
+		return "", err
+	}
+
+	var backtrack func(int, int) int
+	backtrack = func(index, beam int) int {
+		// index tells what splitters line we are processing
+		// beam is the current "root" beam position
+
+		// base: reached the end of the lines, count as one valid way
+		if index >= len(splittersLines) {
+			return 1
+		}
+
+		// if we have a split here, count on branch left and right
+		if splittersLines[index].Contains(beam) {
+			return backtrack(index+1, beam-1) + backtrack(index+1, beam+1)
+		} else { // otherwise continue straight
+			return backtrack(index+1, beam)
+		}
+	}
+
+	countTimeline := backtrack(0, beamOrigin)
+	return fmt.Sprintf("The beam can be split in %d different ways\n", countTimeline), nil
 }
