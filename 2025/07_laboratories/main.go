@@ -44,7 +44,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error: %v\n", err)
 	}
-	fmt.Printf("The beam is splitted %d times\n", result)
+	fmt.Printf("The beam is split %d times\n", result)
 }
 
 func partOne(filename string) (int, error) {
@@ -65,6 +65,12 @@ func partOne(filename string) (int, error) {
 			beams.Add(beam)
 			break
 		}
+	}
+	if err := scanner.Err(); err != nil {
+		return 0, err
+	}
+	if beams.Size() == 0 {
+		return 0, fmt.Errorf("no beam origin 'S' found in the input")
 	}
 
 	// now split the beam(s) while reading line by line
@@ -89,6 +95,9 @@ func partOne(filename string) (int, error) {
 			}
 		}
 	}
+	if err := scanner.Err(); err != nil {
+		return 0, err
+	}
 
 	return splitCount, nil
 }
@@ -96,10 +105,11 @@ func partOne(filename string) (int, error) {
 func getSplitters(s string, b byte) *Set[int] {
 	splitters := NewSet[int]()
 	for i := 0; i < len(s); {
+		// IndexByte for slightly faster search, i read somewhere hehe
 		idx := strings.IndexByte(s[i:], b)
 		if idx == -1 {
 			break
-		} // not founc
+		} // not found
 		splitters.Add(i + idx)
 		i += idx + 1 // next look after found index
 	}
