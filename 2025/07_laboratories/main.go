@@ -157,7 +157,10 @@ func partTwo(filename string) (string, error) {
 		return "", err
 	}
 
-	var backtrack func(int, int) int
+	// memoization for backtracking
+	var backtrack func(index, beam int) int
+	type state struct{ index, beam int }
+	memoization := make(map[state]int)
 	backtrack = func(index, beam int) int {
 		// index tells what splitters line we are processing
 		// beam is the current "root" beam position
@@ -166,13 +169,21 @@ func partTwo(filename string) (string, error) {
 		if index >= len(splittersLines) {
 			return 1
 		}
+		// get value from memo if already computed
+		key := state{index, beam}
+		if count, exists := memoization[key]; exists {
+			return count
+		}
 
 		// if we have a split here, count on branch left and right
+		var count int
 		if splittersLines[index].Contains(beam) {
-			return backtrack(index+1, beam-1) + backtrack(index+1, beam+1)
+			count = backtrack(index+1, beam-1) + backtrack(index+1, beam+1)
 		} else { // otherwise continue straight
-			return backtrack(index+1, beam)
+			count = backtrack(index+1, beam)
 		}
+		memoization[key] = count
+		return count
 	}
 
 	countTimeline := backtrack(0, beamOrigin)
