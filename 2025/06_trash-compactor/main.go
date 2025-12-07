@@ -116,35 +116,36 @@ func partTwo(fname string) (uint64, error) {
 		return 0, err
 	}
 
+	// separate number lines and symbol line
 	numLines := lines[:len(lines)-1]
 	if !verifyNumLines(numLines) {
 		return 0, fmt.Errorf("inconsistent line lengths in number lines")
 	}
-	symsLine := lines[len(lines)-1]
-	syms := parseSymLine(symsLine)
+	symLine := lines[len(lines)-1]
+	syms := parseSymLine(symLine)
 
 	// process numbers by right-to-left one column at a time
-	charCount := len(numLines[0])
-	symsIdx := len(syms) - 1
-	curNums := make([]uint64, 0)
-	grandResult := uint64(0)
-	for i := charCount - 1; i >= -1; i-- {
-		var charColumn []int
+	lenColumn := len(numLines[0]) // how many chars to process
+	curNums := make([]uint64, 0)  // store current numbers for symbol operation
+	curSymsIdx := len(syms) - 1   // which symbol to use for curNums
+	grandResult := uint64(0)      // final result
+	for i := lenColumn - 1; i >= -1; i-- {
+		var curColumn []int
 
-		// handle character column, i == -1 means we are done with digits
+		// handle character column, i == -1 means we are done with digits (and process last symbol)
 		if i >= 0 {
 			for j := range numLines {
 				char := numLines[j][i]
 				num := byteToDigit(char)
 				if num >= 0 {
-					charColumn = append(charColumn, num)
+					curColumn = append(curColumn, num)
 				}
 			}
 		}
 
-		// if charColumn is empty, then we math with symbols
-		if len(charColumn) == 0 {
-			sym := syms[symsIdx]
+		// if curColumn is empty, then we math with symbols
+		if len(curColumn) == 0 {
+			sym := syms[curSymsIdx]
 			var innerResult uint64
 			if sym == '*' {
 				innerResult = 1
@@ -157,15 +158,16 @@ func partTwo(fname string) (uint64, error) {
 					innerResult += num
 				}
 			}
-			fmt.Printf("%d %c: %d\n", symsIdx, sym, innerResult)
+			fmt.Printf("%d %c: %d\n", curSymsIdx, sym, innerResult)
 			grandResult += innerResult
 			curNums = curNums[:0] // reset for next column
-			symsIdx--
-		} else {
+			curSymsIdx--
+
 			// otherwise, we collect the numbers
-			num := digitsToUint64(charColumn)
+		} else {
+			num := digitsToUint64(curColumn)
 			curNums = append(curNums, num)
-			fmt.Printf("col %d: %v -> %d\n", i, charColumn, num)
+			fmt.Printf("col %d: %v -> %d\n", i, curColumn, num)
 		}
 	}
 
