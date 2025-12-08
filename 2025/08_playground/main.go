@@ -56,7 +56,9 @@ func processV1(filename string, connection int) (string, error) {
 	if err := scanner.Err(); err != nil {
 		return "", err
 	}
-	fmt.Printf("Read %d points\n", len(points))
+	if len(points) < 3 {
+		return "", fmt.Errorf("need minimum 3 points, got %d", len(points))
+	}
 
 	// heapify while calculating distances
 	// why heap? note that we don't need exactly sorted list, just N shortest for now
@@ -70,7 +72,6 @@ func processV1(filename string, connection int) (string, error) {
 			}
 		}
 	}
-	fmt.Printf("Calculated distances, kept %d shortest\n", nthShortest.len())
 
 	// now create the circuit from the pairs
 	mapCircuitToPoints := make(map[int][]int, nthShortest.len())
@@ -85,17 +86,17 @@ func processV1(filename string, connection int) (string, error) {
 		if p1used && p2used {
 			if c1id == c2id {
 				continue // same circuit, skip
-			} else { // otherwise merge circuits
-				// delete circuit c2id, move all points to c1id
-				movingPoints := mapCircuitToPoints[c2id]
-				for _, mp := range movingPoints {
-					mapPointsToCircuit[mp] = c1id
-				}
-				mapCircuitToPoints[c1id] = append(mapCircuitToPoints[c1id], movingPoints...)
-				delete(mapCircuitToPoints, c2id)
-				continue
-
 			}
+
+			// different circuit, merge:
+			// delete circuit c2id, move all points to c1id
+			movingPoints := mapCircuitToPoints[c2id]
+			for _, mp := range movingPoints {
+				mapPointsToCircuit[mp] = c1id
+			}
+			mapCircuitToPoints[c1id] = append(mapCircuitToPoints[c1id], movingPoints...)
+			delete(mapCircuitToPoints, c2id)
+			continue
 		}
 
 		// if one of the points used...
@@ -111,30 +112,35 @@ func processV1(filename string, connection int) (string, error) {
 		}
 
 		// if none used, create new circuit
-		if !p1used && !p2used {
-			mapPointsToCircuit[p1id] = circuitID
-			mapPointsToCircuit[p2id] = circuitID
-			mapCircuitToPoints[circuitID] = []int{p1id, p2id}
-			circuitID++
+		mapPointsToCircuit[p1id] = circuitID
+		mapPointsToCircuit[p2id] = circuitID
+		mapCircuitToPoints[circuitID] = []int{p1id, p2id}
+		circuitID++
+	}
+
+	// count how many points with no pairing
+	singlePoints := 0
+	for _, p := range points {
+		if _, used := mapPointsToCircuit[p.id]; !used {
+			singlePoints++
 		}
 	}
 
-	// now count how many points are in circuits
-	countSet := make(map[int]struct{}, len(mapCircuitToPoints))
+	// now compute sizes of all circuits
+	sizes := make([]int, 0, len(mapCircuitToPoints))
 	for _, points := range mapCircuitToPoints {
-		countSet[len(points)] = struct{}{}
+		sizes = append(sizes, len(points))
 	}
-
-	// sort the counts
-	counts := make([]int, 0, len(countSet))
-	for k := range countSet {
-		counts = append(counts, k)
-	}
-	sort.Slice(counts, func(i, j int) bool {
-		return counts[i] > counts[j]
+	// and sort descending
+	sort.Slice(sizes, func(i, j int) bool {
+		return sizes[i] > sizes[j]
 	})
+	// and add single points as size 1 circuits
+	for i := 0; i < singlePoints; i++ {
+		sizes = append(sizes, 1)
+	}
 
-	result := counts[0] * counts[1] * counts[2]
+	result := sizes[0] * sizes[1] * sizes[2]
 	return fmt.Sprintf("%d", result), nil
 }
 
