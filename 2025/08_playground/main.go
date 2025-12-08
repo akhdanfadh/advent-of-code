@@ -20,6 +20,10 @@ func main() {
 	var err error
 	switch *version {
 	case "1":
+		if *connection < 1 {
+			fmt.Fprintf(os.Stderr, "Error: connection must be >= 1, got %d\n", *connection)
+			os.Exit(1)
+		}
 		result, err = processV1(*filename, *connection)
 	default:
 		fmt.Fprintf(os.Stderr, "Error: unknown version %s\n", *version)
