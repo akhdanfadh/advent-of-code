@@ -5,6 +5,9 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
+	"time"
 )
 
 func main() {
@@ -12,6 +15,8 @@ func main() {
 	filename := flag.String("f", "", "input file name (required)")
 	version := flag.String("v", "1", "logic version")
 	flag.Parse()
+
+	now := time.Now()
 
 	// main logic
 	var result string
@@ -23,6 +28,9 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error: unknown version %s\n", *version)
 		os.Exit(1)
 	}
+
+	diff := time.Since(now)
+	fmt.Printf("Time taken: %v\n", diff)
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -40,16 +48,15 @@ func processV1(filename string) (string, error) {
 	defer file.Close() // error ignored (file only for reading)
 
 	// read file line by line
-	var x, y uint
 	tiles := []tile{}
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
-		_, err := fmt.Sscanf(line, "%d,%d", &x, &y)
+		tile, err := parseTile(line)
 		if err != nil {
 			return "", err
 		}
-		tiles = append(tiles, tile{x, y})
+		tiles = append(tiles, tile)
 	}
 	if err := scanner.Err(); err != nil {
 		return "", err
@@ -72,17 +79,31 @@ type tile struct {
 	x, y uint
 }
 
+func parseTile(s string) (tile, error) {
+	sep := strings.IndexByte(s, ',')
+	if sep == -1 {
+		return tile{}, fmt.Errorf("invalid tile format: %s", s)
+	}
+	x, err := strconv.ParseUint(s[:sep], 10, 32)
+	if err != nil {
+		return tile{}, err
+	}
+	y, err := strconv.ParseUint(s[sep+1:], 10, 32)
+	if err != nil {
+		return tile{}, err
+	}
+	return tile{uint(x), uint(y)}, nil
+}
+
 func calcArea(t1, t2 tile) uint {
-	var x, y uint
-	if t1.x > t2.x {
-		x = t1.x - t2.x + 1
-	} else {
-		x = t2.x - t1.x + 1
-	}
-	if t1.y > t2.y {
-		y = t1.y - t2.y + 1
-	} else {
-		y = t2.y - t1.y + 1
-	}
+	x := absDiff(t1.x, t2.x) + 1
+	y := absDiff(t1.y, t2.y) + 1
 	return x * y
+}
+
+func absDiff(a, b uint) uint {
+	if a > b {
+		return a - b
+	}
+	return b - a
 }
