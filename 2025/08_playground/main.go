@@ -222,38 +222,48 @@ type (
 		dist   float64
 	}
 	pairHeap []pair
-	circuits []int // disjoint set: idx is point id, value is parent id
+	circuits struct {
+		parent []int
+		size   []int
+	}
 )
 
 func initCircuits(size int) *circuits {
-	c := make(circuits, size)
+	parent := make([]int, size)
+	sizes := make([]int, size)
 	for i := range size {
-		c[i] = i
+		parent[i] = i
+		sizes[i] = 1 // each start with its own group (size 1)
 	}
-	return &c
+	return &circuits{parent: parent, size: sizes}
 }
 
 func (c *circuits) getRootSizes() []int {
-	// count how many elements point to each root
-	sizeMap := make(map[int]int)
-	for i := range *c {
+	seen := make(map[int]struct{})
+	sizes := make([]int, 0)
+	for i := range c.parent {
 		root := c.find(i)
-		sizeMap[root]++
-	}
-	// extract sizes into slice
-	sizes := make([]int, 0, len(sizeMap))
-	for _, size := range sizeMap {
-		sizes = append(sizes, size)
+		if _, exists := seen[root]; !exists {
+			seen[root] = struct{}{}
+			sizes = append(sizes, c.size[root]) // get size from root
+		}
 	}
 	return sizes
 }
 
 func (c *circuits) find(pid int) int {
 	// keep following parent until root (point to itself)
-	for pid != (*c)[pid] {
-		pid = (*c)[pid]
+	root := pid
+	for root != c.parent[root] {
+		root = c.parent[root]
 	}
-	return pid
+	// path compression (flatten tree)
+	for pid != root {
+		next := c.parent[pid]
+		c.parent[pid] = root
+		pid = next
+	}
+	return root
 }
 
 func (c *circuits) union(pid1, pid2 int) {
@@ -261,7 +271,14 @@ func (c *circuits) union(pid1, pid2 int) {
 	root1 := c.find(pid1)
 	root2 := c.find(pid2)
 	if root1 != root2 {
-		(*c)[root2] = root1
+		// attach smaller to larger
+		if c.size[root1] < c.size[root2] {
+			c.parent[root1] = root2
+			c.size[root2] += c.size[root1]
+		} else {
+			c.parent[root2] = root1
+			c.size[root1] += c.size[root2]
+		}
 	}
 }
 
