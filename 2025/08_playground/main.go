@@ -25,6 +25,8 @@ func main() {
 			os.Exit(1)
 		}
 		result, err = processV1(*filename, *connection)
+	case "1a":
+		result, err = processV1a(*filename, *connection)
 	default:
 		fmt.Fprintf(os.Stderr, "Error: unknown version %s\n", *version)
 		os.Exit(1)
@@ -148,6 +150,68 @@ func processV1(filename string, connection int) (string, error) {
 	return fmt.Sprintf("%d", result), nil
 }
 
+func processV1a(filename string, connection int) (string, error) {
+	// open file
+	file, err := os.Open(filename)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close() // error ignored (file only for reading)
+
+	// read points
+	var x, y, z int
+	points := []point{}
+	scanner := bufio.NewScanner(file)
+	for i := 0; scanner.Scan(); i++ {
+		line := scanner.Text()
+		_, err := fmt.Sscanf(line, "%d,%d,%d", &x, &y, &z)
+		if err != nil {
+			return "", err
+		}
+		points = append(points, point{id: i, x: x, y: y, z: z})
+	}
+	if err := scanner.Err(); err != nil {
+		return "", err
+	}
+
+	// validate input
+	if len(points) < 3 {
+		return "", fmt.Errorf("need minimum 3 points, got %d", len(points))
+	}
+	maxPairs := len(points) * (len(points) - 1) / 2
+	if connection > maxPairs {
+		connection = maxPairs
+	}
+
+	// heapify while calculating distances
+	// why heap? note that we don't need exactly sorted list, just N shortest for now
+	pairs := &pairHeap{}
+	for i := 0; i < len(points); i++ {
+		for j := i + 1; j < len(points); j++ {
+			dist := calcDist(points[i], points[j])
+			pairs.push(pair{p1: points[i], p2: points[j], dist: dist})
+			if pairs.len() > connection {
+				pairs.pop()
+			}
+		}
+	}
+
+	// build circuits with disjoint set
+	circuits := initCircuits(len(points))
+	for _, pair := range *pairs {
+		circuits.union(pair.p1.id, pair.p2.id)
+	}
+
+	// get each circuit sizes and sort descending
+	sizes := circuits.getRootSizes()
+	sort.Slice(sizes, func(i, j int) bool {
+		return sizes[i] > sizes[j]
+	})
+
+	result := sizes[0] * sizes[1] * sizes[2]
+	return fmt.Sprintf("%d", result), nil
+}
+
 type (
 	point struct {
 		id      int
@@ -158,7 +222,48 @@ type (
 		dist   float64
 	}
 	pairHeap []pair
+	circuits []int // disjoint set: idx is point id, value is parent id
 )
+
+func initCircuits(size int) *circuits {
+	c := make(circuits, size)
+	for i := range size {
+		c[i] = i
+	}
+	return &c
+}
+
+func (c *circuits) getRootSizes() []int {
+	// count how many elements point to each root
+	sizeMap := make(map[int]int)
+	for i := range *c {
+		root := c.find(i)
+		sizeMap[root]++
+	}
+	// extract sizes into slice
+	sizes := make([]int, 0, len(sizeMap))
+	for _, size := range sizeMap {
+		sizes = append(sizes, size)
+	}
+	return sizes
+}
+
+func (c *circuits) find(pid int) int {
+	// keep following parent until root (point to itself)
+	for pid != (*c)[pid] {
+		pid = (*c)[pid]
+	}
+	return pid
+}
+
+func (c *circuits) union(pid1, pid2 int) {
+	// attach one root to another
+	root1 := c.find(pid1)
+	root2 := c.find(pid2)
+	if root1 != root2 {
+		(*c)[root2] = root1
+	}
+}
 
 func (h *pairHeap) len() int {
 	return len(*h)
@@ -205,5 +310,6 @@ func (h *pairHeap) pop() pair {
 }
 
 func calcDist(a, b point) float64 {
+	// note that this is not the actual distance, but squared distance just for comparison
 	return float64((a.x-b.x)*(a.x-b.x) + (a.y-b.y)*(a.y-b.y) + (a.z-b.z)*(a.z-b.z))
 }
