@@ -166,42 +166,36 @@ func processV2(filename string) (string, error) {
 		return "", err
 	}
 
-	// build pairs as heap but no min size
-	pairs := &pairMinHeap{}
+	// since we need all pairs sorted, heap complexity won't help much here
+	pairs := make([]pair, 0, len(points)*(len(points)-1)/2)
 	for i := 0; i < len(points); i++ {
 		for j := i + 1; j < len(points); j++ {
 			dist := calcDist(points[i], points[j])
-			pairs.push(pair{p1: points[i], p2: points[j], dist: dist})
+			pairs = append(pairs, pair{p1: points[i], p2: points[j], dist: dist})
 		}
 	}
+	// sort all pairs by distance ascending
+	sort.Slice(pairs, func(i, j int) bool {
+		return pairs[i].dist < pairs[j].dist
+	})
 
 	// process shortest pair one by one until all points connected
 	circuits := initCircuits(len(points)) // disjoint set
-	allConnected := false
+	numComponents := len(points)          // start with n separate components
 	var x1, x2 int
-	for pairs.len() > 0 {
-		shortest := pairs.pop()
+	for _, shortest := range pairs {
 		fmt.Printf("Connecting point %d and %d with distance %.2f\n", shortest.p1.id, shortest.p2.id, shortest.dist)
-		circuits.union(shortest.p1.id, shortest.p2.id)
-
-		// check if all connected: all points have the same root
-		root := circuits.find(0)
-		allConnected = true
-		for id := 1; id < len(circuits.parent); id++ {
-			if circuits.find(id) != root {
-				allConnected = false
+		if circuits.union(shortest.p1.id, shortest.p2.id) {
+			numComponents-- // decrement if union actually merged two components
+			if numComponents == 1 {
+				x1 = shortest.p1.x
+				x2 = shortest.p2.x
 				break
 			}
 		}
-
-		if allConnected {
-			x1 = shortest.p1.x
-			x2 = shortest.p2.x
-			break
-		}
 	}
 
-	if allConnected {
+	if numComponents == 1 {
 		return fmt.Sprintf("Multiplying the X coordinates of the last two junction boxes got %d", x1*x2), nil
 	}
 	return "", fmt.Errorf("could not connect all points")

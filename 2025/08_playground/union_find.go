@@ -43,7 +43,7 @@ func (c *circuits) find(pid int) int {
 	return root
 }
 
-func (c *circuits) union(pid1, pid2 int) {
+func (c *circuits) union(pid1, pid2 int) bool {
 	// attach one root to another
 	root1 := c.find(pid1)
 	root2 := c.find(pid2)
@@ -56,5 +56,7 @@ func (c *circuits) union(pid1, pid2 int) {
 			c.parent[root2] = root1
 			c.size[root1] += c.size[root2]
 		}
+		return true // merge happened
 	}
+	return false // already in same set
 }
