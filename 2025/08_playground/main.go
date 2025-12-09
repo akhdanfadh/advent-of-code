@@ -27,6 +27,8 @@ func main() {
 		result, err = processV1(*filename, *connection)
 	case "1a":
 		result, err = processV1a(*filename, *connection)
+	case "2":
+		result, err = processV2(*filename)
 	default:
 		fmt.Fprintf(os.Stderr, "Error: unknown version %s\n", *version)
 		os.Exit(1)
@@ -155,6 +157,54 @@ func processV1a(filename string, connection int) (string, error) {
 
 	result := sizes[0] * sizes[1] * sizes[2]
 	return fmt.Sprintf("%d", result), nil
+}
+
+func processV2(filename string) (string, error) {
+	// get points from file
+	points, err := readPointsFromFile(filename)
+	if err != nil {
+		return "", err
+	}
+
+	// build pairs as heap but no min size
+	pairs := &pairMinHeap{}
+	for i := 0; i < len(points); i++ {
+		for j := i + 1; j < len(points); j++ {
+			dist := calcDist(points[i], points[j])
+			pairs.push(pair{p1: points[i], p2: points[j], dist: dist})
+		}
+	}
+
+	// process shortest pair one by one until all points connected
+	circuits := initCircuits(len(points)) // disjoint set
+	allConnected := false
+	var x1, x2 int
+	for pairs.len() > 0 {
+		shortest := pairs.pop()
+		fmt.Printf("Connecting point %d and %d with distance %.2f\n", shortest.p1.id, shortest.p2.id, shortest.dist)
+		circuits.union(shortest.p1.id, shortest.p2.id)
+
+		// check if all connected: all points have the same root
+		root := circuits.find(0)
+		allConnected = true
+		for id := 1; id < len(circuits.parent); id++ {
+			if circuits.find(id) != root {
+				allConnected = false
+				break
+			}
+		}
+
+		if allConnected {
+			x1 = shortest.p1.x
+			x2 = shortest.p2.x
+			break
+		}
+	}
+
+	if allConnected {
+		return fmt.Sprintf("Multiplying the X coordinates of the last two junction boxes got %d", x1*x2), nil
+	}
+	return "", fmt.Errorf("could not connect all points")
 }
 
 type (
