@@ -40,50 +40,21 @@ func main() {
 }
 
 func processV1(filename string, connection int) (string, error) {
-	// open file
-	file, err := os.Open(filename)
+	// read points from file
+	points, err := readPointsFromFile(filename)
 	if err != nil {
 		return "", err
-	}
-	defer file.Close() // error ignored (file only for reading)
-
-	// read points
-	var x, y, z int
-	points := []point{}
-	scanner := bufio.NewScanner(file)
-	for i := 0; scanner.Scan(); i++ {
-		line := scanner.Text()
-		_, err := fmt.Sscanf(line, "%d,%d,%d", &x, &y, &z)
-		if err != nil {
-			return "", err
-		}
-		points = append(points, point{id: i, x: x, y: y, z: z})
-	}
-	if err := scanner.Err(); err != nil {
-		return "", err
-	}
-	if len(points) < 3 {
-		return "", fmt.Errorf("need minimum 3 points, got %d", len(points))
 	}
 
 	// heapify while calculating distances
 	// why heap? note that we don't need exactly sorted list, just N shortest for now
-	nthShortest := &pairHeap{}
-	for i := 0; i < len(points); i++ {
-		for j := i + 1; j < len(points); j++ {
-			dist := calcDist(points[i], points[j])
-			nthShortest.push(pair{p1: points[i], p2: points[j], dist: dist})
-			if nthShortest.len() > connection {
-				nthShortest.pop()
-			}
-		}
-	}
+	pairs := buildPairHeap(points, connection)
 
 	// now create the circuit from the pairs
-	mapCircuitToPoints := make(map[int][]int, nthShortest.len())
-	mapPointsToCircuit := make(map[int]int, nthShortest.len())
+	mapCircuitToPoints := make(map[int][]int, pairs.len())
+	mapPointsToCircuit := make(map[int]int, pairs.len())
 	circuitID := 0
-	for _, pair := range *nthShortest {
+	for _, pair := range *pairs {
 		p1id, p2id := pair.p1.id, pair.p2.id
 		c1id, p1used := mapPointsToCircuit[p1id]
 		c2id, p2used := mapPointsToCircuit[p2id]
@@ -151,26 +122,9 @@ func processV1(filename string, connection int) (string, error) {
 }
 
 func processV1a(filename string, connection int) (string, error) {
-	// open file
-	file, err := os.Open(filename)
+	// read points from file
+	points, err := readPointsFromFile(filename)
 	if err != nil {
-		return "", err
-	}
-	defer file.Close() // error ignored (file only for reading)
-
-	// read points
-	var x, y, z int
-	points := []point{}
-	scanner := bufio.NewScanner(file)
-	for i := 0; scanner.Scan(); i++ {
-		line := scanner.Text()
-		_, err := fmt.Sscanf(line, "%d,%d,%d", &x, &y, &z)
-		if err != nil {
-			return "", err
-		}
-		points = append(points, point{id: i, x: x, y: y, z: z})
-	}
-	if err := scanner.Err(); err != nil {
 		return "", err
 	}
 
@@ -185,16 +139,7 @@ func processV1a(filename string, connection int) (string, error) {
 
 	// heapify while calculating distances
 	// why heap? note that we don't need exactly sorted list, just N shortest for now
-	pairs := &pairHeap{}
-	for i := 0; i < len(points); i++ {
-		for j := i + 1; j < len(points); j++ {
-			dist := calcDist(points[i], points[j])
-			pairs.push(pair{p1: points[i], p2: points[j], dist: dist})
-			if pairs.len() > connection {
-				pairs.pop()
-			}
-		}
-	}
+	pairs := buildPairHeap(points, connection)
 
 	// build circuits with disjoint set
 	circuits := initCircuits(len(points))
@@ -221,109 +166,47 @@ type (
 		p1, p2 point
 		dist   float64
 	}
-	pairHeap []pair
-	circuits struct {
-		parent []int
-		size   []int
-	}
 )
 
-func initCircuits(size int) *circuits {
-	parent := make([]int, size)
-	sizes := make([]int, size)
-	for i := range size {
-		parent[i] = i
-		sizes[i] = 1 // each start with its own group (size 1)
+func readPointsFromFile(filename string) ([]point, error) {
+	// open file
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
 	}
-	return &circuits{parent: parent, size: sizes}
+	defer file.Close() // error ignored (file only for reading)
+
+	// read points
+	var x, y, z int
+	points := []point{}
+	scanner := bufio.NewScanner(file)
+	for i := 0; scanner.Scan(); i++ {
+		line := scanner.Text()
+		_, err := fmt.Sscanf(line, "%d,%d,%d", &x, &y, &z)
+		if err != nil {
+			return nil, err
+		}
+		points = append(points, point{id: i, x: x, y: y, z: z})
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	return points, nil
 }
 
-func (c *circuits) getRootSizes() []int {
-	seen := make(map[int]struct{})
-	sizes := make([]int, 0)
-	for i := range c.parent {
-		root := c.find(i)
-		if _, exists := seen[root]; !exists {
-			seen[root] = struct{}{}
-			sizes = append(sizes, c.size[root]) // get size from root
+func buildPairHeap(points []point, connection int) *pairHeap {
+	pairs := &pairHeap{}
+	for i := 0; i < len(points); i++ {
+		for j := i + 1; j < len(points); j++ {
+			dist := calcDist(points[i], points[j])
+			pairs.push(pair{p1: points[i], p2: points[j], dist: dist})
+			if pairs.len() > connection {
+				pairs.pop()
+			}
 		}
 	}
-	return sizes
-}
-
-func (c *circuits) find(pid int) int {
-	// keep following parent until root (point to itself)
-	root := pid
-	for root != c.parent[root] {
-		root = c.parent[root]
-	}
-	// path compression (flatten tree)
-	for pid != root {
-		next := c.parent[pid]
-		c.parent[pid] = root
-		pid = next
-	}
-	return root
-}
-
-func (c *circuits) union(pid1, pid2 int) {
-	// attach one root to another
-	root1 := c.find(pid1)
-	root2 := c.find(pid2)
-	if root1 != root2 {
-		// attach smaller to larger
-		if c.size[root1] < c.size[root2] {
-			c.parent[root1] = root2
-			c.size[root2] += c.size[root1]
-		} else {
-			c.parent[root2] = root1
-			c.size[root1] += c.size[root2]
-		}
-	}
-}
-
-func (h *pairHeap) len() int {
-	return len(*h)
-}
-
-func (h *pairHeap) push(p pair) {
-	// add new element at the end
-	*h = append(*h, p)
-	// percolate up while larger than parent
-	i := h.len() - 1
-	par := (i - 1) / 2
-	for i > 0 && (*h)[i].dist > (*h)[par].dist {
-		(*h)[i], (*h)[par] = (*h)[par], (*h)[i]
-		i = par
-		par = (i - 1) / 2
-	}
-}
-
-func (h *pairHeap) pop() pair {
-	if h.len() == 0 {
-		return pair{}
-	}
-	p := (*h)[0]         // pop root
-	size := h.len() - 1  // new size
-	(*h)[0] = (*h)[size] // move last to root
-	*h = (*h)[:size]     // shrink slice
-	// percolate down while smaller than children
-	i := 0
-	for 2*i+1 < size { // while there is at least one child (left)
-		par, lef, rig := i, 2*i+1, 2*i+2
-		if lef < size && (*h)[par].dist < (*h)[lef].dist {
-			par = lef
-		}
-		if rig < size && (*h)[par].dist < (*h)[rig].dist {
-			par = rig
-		}
-		if par == i { // no swap happened
-			break
-		}
-		(*h)[i], (*h)[par] = (*h)[par], (*h)[i] // now swap
-		i = par
-	}
-	return p
+	return pairs
 }
 
 func calcDist(a, b point) float64 {
