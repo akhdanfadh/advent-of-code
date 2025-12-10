@@ -13,6 +13,7 @@ func main() {
 	// program input
 	filename := flag.String("f", "", "input file name (required)")
 	version := flag.String("v", "1", "logic version")
+	sampleSize := flag.Int("s", 0, "sample size for version 2")
 	flag.Parse()
 
 	now := time.Now()
@@ -26,7 +27,13 @@ func main() {
 	case "1a":
 		result, err = processV1a(*filename)
 	case "2":
-		result, err = processV2(*filename)
+		if *sampleSize < 1 {
+			fmt.Fprintf(os.Stderr, "Error: sample size must be > 0\n")
+			os.Exit(1)
+		}
+		result, err = processV2(*filename, *sampleSize)
+	case "2a":
+		result, err = processV2a(*filename)
 	default:
 		fmt.Fprintf(os.Stderr, "Error: unknown version %s\n", *version)
 		os.Exit(1)

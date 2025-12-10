@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-func processV2(filename string) (string, error) {
+func processV2a(filename string) (string, error) {
 	// open file
 	file, err := os.Open(filename)
 	if err != nil {
