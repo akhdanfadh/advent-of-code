@@ -34,6 +34,8 @@ func main() {
 		result, err = processV2(*filename, *sampleSize)
 	case "2a":
 		result, err = processV2a(*filename)
+	case "2b":
+		result, err = processV2b(*filename)
 	default:
 		fmt.Fprintf(os.Stderr, "Error: unknown version %s\n", *version)
 		os.Exit(1)
