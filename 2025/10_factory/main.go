@@ -26,6 +26,10 @@ func main() {
 		result, err = processV1(*filename)
 	case "1a":
 		result, err = processV1a(*filename)
+	case "2":
+		result, err = processV2(*filename)
+	case "2a":
+		result, err = processV2a(*filename)
 	default:
 		fmt.Fprintf(os.Stderr, "Error: unknown version %s\n", *version)
 		os.Exit(1)
