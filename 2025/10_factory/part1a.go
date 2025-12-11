@@ -74,9 +74,26 @@ func (m *machine) gaussianElimination(matrix [][]int) []int {
 	//   the first equation has the first variable, the second equation has the second variable, etc
 	// this is like moving an equation to the top of our list so we can use it to eliminate variables in other equations
 	//
-	// we iterate through each column (button), and stop either when we've processed all buttons or all rows
-	// double condition is important bcs we may have underdetermined system (more buttons than lights) or otherwise
-	for col := 0; col < numButtons && pivotRow < numLights; col++ {
+	for col := range numButtons {
+
+		// if we have more buttons than lights and we've already consumed every row,
+		// the rest of the columns are automatically "free" because there are no more equations to constrain them.
+		//
+		// for example (2 lights, 4 buttons):
+		// - equations: B0 XOR B2 XOR B3 = 1 and B1 XOR B2 XOR B3 = 1.
+		// - with the old buggy loop, we early exit if we've used all rows.
+		//   but see this: after picking pivots in cols 0 and 1, we exit early and treat x2 and x3 as 0.
+		//   solution becomes [B0,B1,B2,B3] = [1,1,0,0] -> 2 presses.
+		// - but B2 and B3 are actually free.
+		// - if we set B2=1, B3=0, back-substitution gives [0,0,1,0] -> 1 press, which is the
+		//   real minimum.
+		// - because those columns were never marked free, that better option was skipped.
+		//
+		if pivotRow >= numLights {
+			freeVars = append(freeVars, col)
+			continue
+		}
+
 		// find a row with a 1 in this column (at or below current pivotRow)
 		foundPivot := false
 		for row := pivotRow; row < numLights; row++ {
