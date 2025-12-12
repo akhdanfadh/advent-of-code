@@ -19,6 +19,10 @@ func processV1(filename string) (string, error) {
 	// - from sparrow github, we got our problem that is 2D nesting algorithm
 	// - googling the term -> https://github.com/sasam2/nesting -> SVGnest!
 	//   https://github.com/Jack000/SVGnest (2019) most starred and readme very good explanation
+	//
+	// additional resource after submitting:
+	// - from reddit aoc 25 day 12, found python package for this exact problem https://pypi.org/project/polyomino/
+	// - i just know aoc reddit community is quite active, that's cool
 
 	// BRUH moment:
 	// - based on those googling, this problem is NP-hard
