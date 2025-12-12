@@ -23,6 +23,8 @@ func main() {
 	switch *version {
 	case "1":
 		result, err = processV1(*filename)
+	case "2":
+		result, err = processV2(*filename)
 	default:
 		fmt.Fprintf(os.Stderr, "Error: unknown version %s\n", *version)
 		os.Exit(1)
