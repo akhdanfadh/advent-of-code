@@ -40,6 +40,11 @@ func main() {
 
 type connections map[string][]string
 
+var (
+	linePattern   = regexp.MustCompile(`^([a-z]{3}):\s*(.*)$`)
+	devicePattern = regexp.MustCompile(`[a-z]{3}`)
+)
+
 func readFile(filename string) (connections, error) {
 	// open file
 	file, err := os.Open(filename)
@@ -67,13 +72,10 @@ func readFile(filename string) (connections, error) {
 }
 
 func parseLine(line string) (string, []string, error) {
-	linePattern := regexp.MustCompile(`^([a-z]{3}):\s*(.*)$`)
 	matches := linePattern.FindStringSubmatch(line)
 	if matches == nil || len(matches) != 3 {
 		return "", nil, fmt.Errorf("invalid line format")
 	}
-
-	devicePattern := regexp.MustCompile(`[a-z]{3}`)
 	from := matches[1]
 	to := devicePattern.FindAllString(matches[2], -1)
 	return from, to, nil
